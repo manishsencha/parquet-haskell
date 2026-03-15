@@ -3,14 +3,12 @@ module Parquet.Decoder.Spec
   )
 where
 
-import Data.Binary.Get (getWord8, lookAhead, runGetOrFail)
 import Data.Binary.Put
-import qualified Data.ByteString as BS
+import Data.Binary.Get (runGetOrFail)
 import qualified Data.ByteString.Lazy as LBS
 import Parquet.Decoder
 import Test.Hspec
-import Test.Hspec.QuickCheck
-import Test.QuickCheck
+import Prelude
 
 spec :: Spec
 spec = describe "Decoder" $ do

@@ -43,19 +43,19 @@ An example schema:
 Then, the following column values:
 ____________________________________________________________________
 
-| rep_level | def_level | path                             | value |
-|___________|___________|__________________________________|_______|
-| 0         | 5         | f1, list, element, list, element | 1     |
-| 2         | 5         | f1, list, element, list, element | 2     |
-| 1         | 5         | f1, list, element, list, element | 3     |
-| 2         | 5         | f1, list, element, list, element | 4     |
-| 1         | 5         | f1, list, element, list, element | 5     |
-| 0         | 0         | f1, list, element, list, element | 1     |
-| 0         | 0         | f1, list, element, list, element | 2     |
-| 0         | 0         | f1, list, element, list, element | 3     |
-| 0         | 0         | f1, list, element, list, element | 2     |
-| 0         | 0         | f1, list, element, list, element | 3     |
-|___________|___________|__________________________________|_______|
+\| rep_level | def_level | path                             | value |
+\|___________|___________|__________________________________|_______|
+\| 0         | 5         | f1, list, element, list, element | 1     |
+\| 2         | 5         | f1, list, element, list, element | 2     |
+\| 1         | 5         | f1, list, element, list, element | 3     |
+\| 2         | 5         | f1, list, element, list, element | 4     |
+\| 1         | 5         | f1, list, element, list, element | 5     |
+\| 0         | 0         | f1, list, element, list, element | 1     |
+\| 0         | 0         | f1, list, element, list, element | 2     |
+\| 0         | 0         | f1, list, element, list, element | 3     |
+\| 0         | 0         | f1, list, element, list, element | 2     |
+\| 0         | 0         | f1, list, element, list, element | 3     |
+\|___________|___________|__________________________________|_______|
 
 should produce the following data:
 Note: Values between "_" characters describe the accumulator we use during the recursion.
@@ -135,6 +135,7 @@ module Parquet.Reader where
 
 import qualified Conduit as C
 import Control.Lens hiding (ix)
+import Control.Monad (foldM)
 import Control.Monad.Except
 import Control.Monad.Logger (MonadLogger, runNoLoggingT)
 import Control.Monad.Logger.CallStack (logError, logInfo, logWarn)
@@ -182,11 +183,12 @@ newtype ParquetSource m = ParquetSource (Integer -> C.ConduitT () ByteString m (
 
 ------------------------------------------------------------------------------
 readFieldTypeMapping ::
-  MonadError Text m => TT.FileMetaData -> m (HashMap Text TT.Type)
+  (MonadError Text m) => TT.FileMetaData -> m (HashMap Text TT.Type)
 readFieldTypeMapping fm =
   let schemaElements = fm ^. TT.pinchField @"schema"
-   in fmap fromList $
-        for schemaElements $ \se -> do
+   in fmap fromList
+        $ for schemaElements
+        $ \se -> do
           let name = se ^. TT.pinchField @"name"
           case se ^. TT.pinchField @"type" of
             Nothing ->
@@ -206,14 +208,14 @@ readMetadata (ParquetSource source) = do
   case BG.runGetOrFail BG.getWord32le bs of
     Left err -> fail $ "Could not fetch metadata size: " <> show err
     Right (_, _, metadataSize) ->
-      fmap (snd . fst) $
-        C.runConduit $
-          source (- (8 + fromIntegral metadataSize))
-            C..| decodeConduit metadataSize
-            `C.fuseBoth` pure ()
+      fmap (snd . fst)
+        $ C.runConduit
+        $ source (-(8 + fromIntegral metadataSize))
+        C..| decodeConduit metadataSize
+        `C.fuseBoth` pure ()
 
 ------------------------------------------------------------------------------
-localParquetFile :: C.MonadResource m => FilePath -> ParquetSource m
+localParquetFile :: (C.MonadResource m) => FilePath -> ParquetSource m
 localParquetFile fp = ParquetSource $ \pos -> C.sourceIOHandle $ do
   h <- openFile fp ReadMode
   if pos > 0 then hSeek h AbsoluteSeek pos else hSeek h SeekFromEnd pos
@@ -243,9 +245,9 @@ remoteParquetFile url = ParquetSource $ \pos -> do
        in if statusIsSuccessful status
             then getResponseBody req
             else
-              fail $
-                "Non-success response code from remoteParquetFile call: "
-                  ++ show status
+              fail
+                $ "Non-success response code from remoteParquetFile call: "
+                ++ show status
 
 ------------------------------------------------------------------------------
 readWholeParquetFile ::
@@ -260,13 +262,13 @@ readWholeParquetFile ::
   m [ParquetValue]
 readWholeParquetFile inputFp = do
   metadata <- readMetadata (localParquetFile inputFp)
-  (`runReaderT` metadata) $
-    C.runConduit $
-      traverse_
-        (sourceRowGroup (localParquetFile inputFp))
-        (metadata ^. TT.pinchField @"row_groups")
-        C..| CL.map convertLiteralJsonLists
-        C..| CL.consume
+  (`runReaderT` metadata)
+    $ C.runConduit
+    $ traverse_
+      (sourceRowGroup (localParquetFile inputFp))
+      (metadata ^. TT.pinchField @"row_groups")
+    C..| CL.map convertLiteralJsonLists
+    C..| CL.consume
 
 ------------------------------------------------------------------------------
 convertLiteralJsonLists :: ParquetValue -> ParquetValue
@@ -284,8 +286,8 @@ sourceParquet fp =
   runExceptT (readMetadata (localParquetFile fp)) >>= \case
     Left err -> fail $ "Could not read metadata: " <> show err
     Right metadata ->
-      C.transPipe (runNoLoggingT . (`runReaderT` metadata)) $
-        traverse_
+      C.transPipe (runNoLoggingT . (`runReaderT` metadata))
+        $ traverse_
           (sourceRowGroup (localParquetFile fp))
           (metadata ^. TT.pinchField @"row_groups")
 
@@ -309,10 +311,10 @@ sourceRowGroupFromRemoteFile ::
   String ->
   TT.RowGroup ->
   C.ConduitT () ParquetValue m ()
-sourceRowGroupFromRemoteFile url rg = sourceRowGroup (remoteParquetFile url) rg
+sourceRowGroupFromRemoteFile url = sourceRowGroup (remoteParquetFile url)
 
 ------------------------------------------------------------------------------
-throwOnNothing :: MonadError err m => err -> Maybe a -> m a
+throwOnNothing :: (MonadError err m) => err -> Maybe a -> m a
 throwOnNothing err Nothing = throwError err
 throwOnNothing _ (Just v) = pure v
 
@@ -408,7 +410,7 @@ generateInstructions = loop Seq.empty
 
 ------------------------------------------------------------------------------
 readSchemaMapping ::
-  MonadReader TT.FileMetaData m =>
+  (MonadReader TT.FileMetaData m) =>
   m (M.Map Text TT.SchemaElement)
 readSchemaMapping = do
   metadata <- ask
@@ -418,10 +420,10 @@ readSchemaMapping = do
     mk_schema_mapping schema = snd $ execState (go mempty) (schema, mempty)
 
     go ::
-      MonadState ([TT.SchemaElement], M.Map Text TT.SchemaElement) m =>
+      (MonadState ([TT.SchemaElement], M.Map Text TT.SchemaElement) m) =>
       Text ->
       m ()
-    go prefix = do
+    go prefix =
       get >>= \case
         ([], _) -> pure ()
         (schema_element : rest, schema_mapping) -> do
@@ -478,7 +480,7 @@ mkInstructions (c, path) = do
     go pathSoFar columnValue = do
       schema_mapping <- readSchemaMapping
       schema_root <- readSchemaRoot
-      instrx <- case columnValue of
+      case columnValue of
         (ColumnValue r d md v, fieldName : restPath) -> do
           let fullPathSoFar = T.intercalate "." $ pathSoFar <> [fieldName]
           case M.lookup (schema_root ^. TT.pinchField @"name" <> "." <> fullPathSoFar) schema_mapping of
@@ -489,52 +491,51 @@ mkInstructions (c, path) = do
                   Nothing <$ logError ("Path doesn't have a repetition type: " <> fullPathSoFar)
                 Just (TT.REQUIRED _)
                   | d == 0 ->
-                    Nothing <$ logError ("Found a REQUIRED schema element while definition level is 0: " <> fullPathSoFar)
+                      Nothing <$ logError ("Found a REQUIRED schema element while definition level is 0: " <> fullPathSoFar)
                   | otherwise -> do
-                    mb_rest_instructions <-
-                      go
-                        (pathSoFar <> [fieldName])
-                        (ColumnValue r d md v, restPath)
-                    pure $ (IObjectField fieldName Seq.<|) <$> mb_rest_instructions
+                      mb_rest_instructions <-
+                        go
+                          (pathSoFar <> [fieldName])
+                          (ColumnValue r d md v, restPath)
+                      pure $ (IObjectField fieldName Seq.<|) <$> mb_rest_instructions
                 Just (TT.OPTIONAL _)
                   | d == 0 ->
-                    case pathSoFar of
-                      [] ->
-                        pure $ Just $ Seq.singleton INullOpt
-                      _ ->
-                        pure $ Just $ Seq.singleton (IValue Null)
+                      case pathSoFar of
+                        [] ->
+                          pure $ Just $ Seq.singleton INullOpt
+                        _ ->
+                          pure $ Just $ Seq.singleton (IValue Null)
                   | otherwise -> do
-                    mb_rest_instructions <-
-                      go
-                        (pathSoFar <> [fieldName])
-                        (ColumnValue r (d - 1) md v, restPath)
-                    pure $ (IObjectField fieldName Seq.<|) <$> mb_rest_instructions
+                      mb_rest_instructions <-
+                        go
+                          (pathSoFar <> [fieldName])
+                          (ColumnValue r (d - 1) md v, restPath)
+                      pure $ (IObjectField fieldName Seq.<|) <$> mb_rest_instructions
                 Just (TT.REPEATED _)
                   | d == 0 ->
-                    Nothing <$ logError ("Found a REPEATED schema element while definition level is 0: " <> fullPathSoFar)
+                      Nothing <$ logError ("Found a REPEATED schema element while definition level is 0: " <> fullPathSoFar)
                   | r == 0 -> do
-                    mb_rest_instructions <-
-                      go
-                        (pathSoFar <> [fieldName])
-                        (ColumnValue r (d - 1) md v, restPath)
-                    pure $ (INewList Seq.<|) <$> mb_rest_instructions
+                      mb_rest_instructions <-
+                        go
+                          (pathSoFar <> [fieldName])
+                          (ColumnValue r (d - 1) md v, restPath)
+                      pure $ (INewList Seq.<|) <$> mb_rest_instructions
                   | r == 1 -> do
-                    mb_rest_instructions <-
-                      go
-                        (pathSoFar <> [fieldName])
-                        (ColumnValue (r - 1) (d - 1) md v, restPath)
-                    pure $ (INewListElement Seq.<|) <$> mb_rest_instructions
+                      mb_rest_instructions <-
+                        go
+                          (pathSoFar <> [fieldName])
+                          (ColumnValue (r - 1) (d - 1) md v, restPath)
+                      pure $ (INewListElement Seq.<|) <$> mb_rest_instructions
                   | otherwise -> do
-                    mb_rest_instructions <-
-                      go
-                        (pathSoFar <> [fieldName])
-                        (ColumnValue (r - 1) (d - 1) md v, restPath)
-                    pure $ (IListElement Seq.<|) <$> mb_rest_instructions
+                      mb_rest_instructions <-
+                        go
+                          (pathSoFar <> [fieldName])
+                          (ColumnValue (r - 1) (d - 1) md v, restPath)
+                      pure $ (IListElement Seq.<|) <$> mb_rest_instructions
         (ColumnValue _ 0 _ v, []) -> pure $ Just $ Seq.singleton $ IValue v
         (ColumnValue {}, []) ->
           Nothing
             <$ logWarn "Saw column with nonzero rep/def levels and empty path."
-      pure instrx
 
 ------------------------------------------------------------------------------
 newtype ColumnConstructor = ColumnConstructor
@@ -589,7 +590,8 @@ sourceRowGroup source rg = do
     mb_path cc =
       TT.unField
         . TT._ColumnMetaData_path_in_schema
-        <$> (cc ^. TT.pinchField @"meta_data")
+        <$> cc
+        ^. TT.pinchField @"meta_data"
 
     construct_record :: ParquetValue -> [ColumnConstructor] -> m ParquetValue
     construct_record = foldM construct_column
@@ -640,11 +642,11 @@ interpretInstructions ::
   InstructionSet ->
   m ParquetValue
 interpretInstructions parquetVal is = do
-  logInfo $
-    "Interpreting instructions: "
-      <> T.pack (show parquetVal)
-      <> ", "
-      <> T.pack (show is)
+  logInfo
+    $ "Interpreting instructions: "
+    <> T.pack (show parquetVal)
+    <> ", "
+    <> T.pack (show is)
   case (parquetVal, is) of
     (EmptyValue, Seq.Empty) -> pure parquetVal
     (ParquetNull, _) -> pure ParquetNull
@@ -656,10 +658,10 @@ interpretInstructions parquetVal is = do
           newValueIntoTheList <- interpretInstructions EmptyValue ix
           pure $ ParquetList $ MkParquetList $ xs <> [newValueIntoTheList]
         v ->
-          throwError $
-            "Wrong parquet value "
-              <> T.pack (show v)
-              <> " type for instruction IListElement"
+          throwError
+            $ "Wrong parquet value "
+            <> T.pack (show v)
+            <> " type for instruction IListElement"
       IListElement -> case pv of
         ParquetList (MkParquetList xs) -> case reverse xs of
           (revX : revXs) -> do
@@ -667,10 +669,10 @@ interpretInstructions parquetVal is = do
             pure $ ParquetList $ MkParquetList $ reverse $ newRevX : revXs
           _ -> throwError "List is empty for NestedListElement instruction"
         v ->
-          throwError $
-            "Wrong parquet value "
-              <> T.pack (show v)
-              <> " type for instruction IListElement"
+          throwError
+            $ "Wrong parquet value "
+            <> T.pack (show v)
+            <> " type for instruction IListElement"
       INewList -> case pv of
         EmptyValue -> do
           newX <- interpretInstructions EmptyValue ix
@@ -679,19 +681,19 @@ interpretInstructions parquetVal is = do
           newX <- interpretInstructions EmptyValue ix
           pure $ ParquetList $ MkParquetList $ xs <> [newX]
         v ->
-          throwError $
-            "Wrong parquet value "
-              <> T.pack (show v)
-              <> " type for instruction INewList"
+          throwError
+            $ "Wrong parquet value "
+            <> T.pack (show v)
+            <> " type for instruction INewList"
       INullOpt -> interpretInstructions pv ix
       IObjectField fieldName -> case pv of
         EmptyValue -> do
           val <- interpretInstructions EmptyValue ix
-          pure $
-            ParquetObject $
-              MkParquetObject $
-                fromList
-                  [(fieldName, val)]
+          pure
+            $ ParquetObject
+            $ MkParquetObject
+            $ fromList
+              [(fieldName, val)]
         ParquetObject (MkParquetObject hm) -> do
           newObj <- flip (at fieldName) hm $ \mbExistingParquetVal ->
             Just
@@ -700,9 +702,9 @@ interpretInstructions parquetVal is = do
                 ix
           pure $ ParquetObject $ MkParquetObject newObj
         v ->
-          throwError $
-            "Cannot apply IObjectField instruction on parquet value "
-              <> T.pack (show v)
+          throwError
+            $ "Cannot apply IObjectField instruction on parquet value "
+            <> T.pack (show v)
 
 ------------------------------------------------------------------------------
 readSchemaRoot :: (MonadReader TT.FileMetaData m, MonadFail m) => m TT.SchemaElement
