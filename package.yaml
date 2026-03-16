@@ -1,10 +1,10 @@
-name: parquet-hs
+name: parquet-hs-next
 version: 0.1.0.0
 synopsis: Streaming Parquet reader
-description: Please see the README on GitHub at <https://github.com/yigitozkavci/parquet-hs#readme>
-author: Yigit Ozkavci
-copyright: 2019-2021 Yigit Ozkavci
-maintainer: Yigit Ozkavci <yigitozkavci8@gmail.com>
+description: Please see the README on GitHub at <https://github.com/manishsencha/parquet-hs#readme>
+author: Manish Sencha
+copyright: 2019-2021 Yigit Ozkavci, 2026 Manish Sencha
+maintainer: Manish Sencha <manishsencha2001@gmail.com>
 category: Compression
 license: BSD3
 
@@ -70,7 +70,7 @@ tests:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-    - parquet-hs
+    - parquet-hs-next
     - hspec
     - QuickCheck
     - bytestring
@@ -83,7 +83,7 @@ tests:
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
-    - parquet-hs
+    - parquet-hs-next
     - hspec
     - QuickCheck
     - bytestring
