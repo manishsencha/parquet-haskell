@@ -1,4 +1,3 @@
-from pyspark import SparkContext
 from pyspark.sql import SparkSession, SQLContext
 
 import json
@@ -20,6 +19,6 @@ output_filename = sys.argv[2]
 with open(input_filename, 'r') as f:
     sqlContext.read.json(
       sc.parallelize(json.load(f))
-    ).coalesce(1).write.parquet(output_filename)
+    ).coalesce(1).write.mode("overwrite").parquet(output_filename)
 
     spark.read.parquet(output_filename).printSchema()

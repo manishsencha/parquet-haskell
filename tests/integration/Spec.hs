@@ -39,11 +39,11 @@ pysparkPythonEnvName = "PYSPARK_PYTHON"
 testParquetFormat :: String -> (String -> IO () -> IO ()) -> IO ()
 testParquetFormat _inputFile performTest =
   bracket_
-    (setEnv pysparkPythonEnvName "/home/manish/projects/parquet-hs/.venv/bin/python3")
+    (setEnv pysparkPythonEnvName "/usr/bin/python3")
     (unsetEnv pysparkPythonEnvName)
     $ do
       callProcess
-        "/home/manish/projects/parquet-hs/.venv/bin/python3"
+        "python3"
         [ testPath </> encoderScriptPath,
           testDataPath </> "input1.json",
           testPath </> intermediateDir
