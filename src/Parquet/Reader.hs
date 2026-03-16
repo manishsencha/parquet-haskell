@@ -727,7 +727,10 @@ sourceColumnChunk ::
 sourceColumnChunk (ParquetSource source) cc = do
   metadata <- ask
   schema_mapping <- readSchemaMapping
-  let offset = cc ^. TT.pinchField @"file_offset"
+  col_metadata <- (cc ^. TT.pinchField @"meta_data") `failOnMay` "Metadata could not be found"
+  let data_offset = col_metadata ^. TT.pinchField @"data_page_offset"
+      dict_offset = col_metadata ^. TT.pinchField @"dictionary_page_offset"
+      offset = maybe data_offset (min data_offset) dict_offset
   logInfo $ "Schema 1: " <> LT.toStrict (pString $ show schema_mapping)
   logInfo $ "Schema 2: " <> LT.toStrict (pString $ show (metadata ^. TT.pinchField @"schema"))
   root <- readSchemaRoot
