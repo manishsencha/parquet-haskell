@@ -7,22 +7,31 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Haskell
-      uses: haskell-actions/setup@v2
-      with:
-        ghc-version: '9.4.8'
-        cabal-version: '3.10.1.0'
-        
-    - name: Build sdist
-      run: cabal sdist
-      
-    - name: Publish to Hackage
-      uses: haskell-actions/hackage-publish@v1.1
-      with:
-        hackageToken: ${{ secrets.HACKAGE_AUTH_TOKEN }}
-        packagesPath: dist-newstyle/sdist/
-        publish: true
+      - uses: actions/checkout@v4
+
+      - name: Setup Haskell
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.4.8"
+          cabal-version: "3.10.1.0"
+
+      - name: Update cabal index
+        run: cabal update
+
+      - name: Build package
+        run: cabal build all
+
+      - name: Run cabal checks
+        run: cabal check
+
+      - name: Create source distribution
+        run: cabal sdist
+
+      - name: Publish to Hackage
+        uses: haskell-actions/hackage-publish@v1
+        with:
+          hackageToken: ${{ secrets.HACKAGE_AUTH_TOKEN }}
+          packagesPath: dist-newstyle/sdist/
+          publish: false
