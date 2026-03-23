@@ -1,5 +1,5 @@
 name: parquet-haskell
-version: 0.1.0.0
+version: 0.1.1.0
 synopsis: Streaming Parquet reader
 description: Please see the README on GitHub at <https://github.com/manishsencha/parquet-haskell#readme>
 github: manishsencha/parquet-haskell
